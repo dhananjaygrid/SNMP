@@ -1,4 +1,6 @@
  #!/usr/bin/perl
+
+
 use DBI;
 #use strict;
 use POSIX qw(strftime);
@@ -12,17 +14,14 @@ print "Opened database successfully\n";
   sub my_receiver {
 	#my $oid;      
 	my $fqdn = select(STDERR);
+	my $status = select(STDERR);  
+    	print "VARBINDS:\n";
 	
-	
-	my $status = select(STDERR);
-      # print the variable bindings:
-      print "VARBINDS:\n";
-	my $dt   = DateTime->now;   # Stores current date and time as datetime object
-        my $date = $dt->ymd;   # Retrieves date as a string in 'yyyy-mm-dd' format
-	my $time = $dt->hms;   # Retrieves time as a string in 'hh:mm:ss' format
-
+	my $dt   = DateTime->now;
+        my $date = $dt->ymd;  
+	my $time = $dt->hms;  
 	my $wanted = "$time";
-	print $wanted;   # creates 'yyyy-mm-dd hh:mm:ss' string
+	print $wanted;   
 	
       foreach my $x (@{$_[1]}) { 
 	
@@ -37,6 +36,7 @@ print "Opened database successfully\n";
 	}
 	#print $wanted;			}
 }
+		
 my $stmt = qq(SELECT fqdn, status, report_time, old_status, old_report from Status);
 my $sth = $dbh->prepare( $stmt );
 my $rv = $sth->execute() or die $DBI::errstr;
@@ -46,31 +46,30 @@ if($rv < 0) {
 }
 
 while(my @row = $sth->fetchrow_array()) {
-	print $row[1];
-	if ($row[0] == 'bubbly.bth.se' && $row[1] == $fqdn){   
+	
+			
+	if ($row[0] eq $fqdn){   
 		
-		#print $row[1];
-		my $stmt1 = qq(UPDATE Status set report_time = '$wanted', old_report = '$row[2]' where fqdn = '$row[0]');
-		#my $stmt2 = qq(UPDATE Status set SALARY = 25000.00 where ID=1;);
+			
+	
+		my $stmt1 = qq(UPDATE Status set status = '$status', old_status = "$row[1]", report_time = '$wanted',  old_report = '$row[2]' where fqdn = '$row[0]');
+		
 
 		my $rv = $dbh->do($stmt1) or die $DBI::errstr;
-		print "why";	}				
-		
-		else {			
-		#elsif  ($fqdn != $row[1]){
-		my $stmt2 = qq(UPDATE Status set report_time = '$wanted', old_report = '$row[2]', status = '$status', old_status = '$row[1]' where fqdn = '$row[0]');
-				     
-		#print  "Yeah", "\n";			
-		my $rv = $dbh->do($stmt2) or die $DBI::errstr;		
+		print "why";
+		#last;
+		goto Tail;
 			}
+
+my $stmt3 = qq(INSERT into Status (fqdn, status, report_time, old_status, old_report) VALUES ('$fqdn', '$status', '$wanted', '$status', '$wanted'));
 		
-		#my $rv = $dbh->do($stmt) or die $DBI::errstr;
-	
-	
-				     				
-				
-				      }
+		print "namastey";
+		my $rv = $dbh->do($stmt3) or die $DBI::errstr;
+		#last;		
+Tail:		
+
 }
+
 print "success";
   NetSNMP::TrapReceiver::register("all", \&my_receiver) || 
     warn "failed to register our perl trap handler\n";
