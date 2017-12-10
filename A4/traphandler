@@ -1,6 +1,4 @@
- #!/usr/bin/perl
-
-
+#!/usr/bin/perl
 use DBI;
 #use strict;
 use POSIX qw(strftime);
@@ -35,8 +33,8 @@ print "Opened database successfully\n";
 	$status = "$x->[1]"; 
 	}
 	#print $wanted;			}
-}
-		
+
+}		
 my $stmt = qq(SELECT fqdn, status, report_time, old_status, old_report from Status);
 my $sth = $dbh->prepare( $stmt );
 my $rv = $sth->execute() or die $DBI::errstr;
@@ -60,13 +58,14 @@ while(my @row = $sth->fetchrow_array()) {
 		#last;
 		goto Tail;
 			}
-
+}
 my $stmt3 = qq(INSERT into Status (fqdn, status, report_time, old_status, old_report) VALUES ('$fqdn', '$status', '$wanted', '$status', '$wanted'));
 		
 		print "namastey";
 		my $rv = $dbh->do($stmt3) or die $DBI::errstr;
 		#last;		
 Tail:		
+
 
 }
 
