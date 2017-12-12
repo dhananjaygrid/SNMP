@@ -1,41 +1,49 @@
 #!/usr/bin/perl
 use DBI;
 #use strict;
+use Net::SNMP;
+use NetSNMP::TrapReceiver;
+
 use POSIX qw(strftime);
-use DateTime;
+#use DateTime;
  #use DBI;
 
    $dbfile = "test.db";
   my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-print "Opened database successfully\n";
 
+print "Opened database successfully\n";
+my $stab = qq(CREATE TABLE IF NOT EXISTS Status (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, fqdn TEXT(20), status INT(10), report_time DATETIME, old_status INT(10), old_report DATETIME););
+
+my $rtab = $dbh->do($stab);
+if($rtab < 0) {
+   print $DBI::errstr;
+} else {
+   print "status Table created successfully\n";
+}
   sub my_receiver {
 	#my $oid;      
 	my $fqdn = select(STDERR);
 	my $status = select(STDERR);  
-    	print "VARBINDS:\n";
-	
-	my $dt   = DateTime->now;
-        my $date = $dt->ymd;  
-	my $time = $dt->hms;  
-	my $wanted = "$time";
-	print $wanted;   
+    	print "VARBINDS:\n";  
+	my $wanted = time();
+	#print $wanted;   
 	
       foreach my $x (@{$_[1]}) { 
 	
 	if("$x->[0]" eq '.1.3.6.1.4.1.41717.10.1')
 	{
-	$fqdn = "$x->[1]";
-	printf $fqdn . "\n"; 
+	$fqdn = $x->[1];
+	#printf $fqdn . "\n"; 
 	}
 	if ("$x->[0]" eq '.1.3.6.1.4.1.41717.10.2')
 	{
-	$status = "$x->[1]"; 
+	$status = $x->[1]; 
 	
 	}
 	#print $wanted;			}
 
-}		
+}	
+print $fqdn,"-----",$status,"\n";	
 my $stmt = qq(SELECT fqdn, status, report_time, old_status, old_report from Status);
 my $sth = $dbh->prepare( $stmt );
 my $rv = $sth->execute() or die $DBI::errstr;
@@ -46,43 +54,31 @@ if($rv < 0) {
 
 while(my @row = $sth->fetchrow_array()) {
 	
-			
+		$row[0] = qq(\"$row[0]\");
+        print $row[0], $fqdn,"\n";	
 	if ($row[0] eq $fqdn){   
 		
 			
 	
-		my $stmt1 = qq(UPDATE Status set status = '$status', old_status = "$row[1]", report_time = '$wanted',  old_report = '$row[2]' where fqdn = '$row[0]');
+		my $stmt1 = qq(UPDATE Status set status = '$status', old_status = "$row[1]", report_time = '$wanted',  old_report = '$row[2]' where fqdn = $row[0]);
 		
 
 		my $rv = $dbh->do($stmt1) or die $DBI::errstr;
-		print "why";
+		#print "why";
 		#last;
 		goto Tail;
 			}
 }
-my $stmt3 = qq(INSERT into Status (fqdn, status, report_time, old_status, old_report) VALUES ('$fqdn', '$status', '$wanted', '$status', '$wanted'));
+my $stmt3 = qq(INSERT into Status (fqdn, status, report_time, old_status, old_report) VALUES ($fqdn, '$status', '$wanted', '$status', '$wanted'));
 		
-		print "namastey";
+		#print "namastey", "\n", $fqdn, "\n";
 		my $rv = $dbh->do($stmt3) or die $DBI::errstr;
 		#last;		
-Tail:		
-my $str1 = qq(SELECT * from Status WHERE status = 2);
-my $stah1 = $dbh->prepare( $str1 );
-my $rv = $stah1->execute() or die $DBI::errstr;
-print "cursor ";
-my @storage;
-$i = 0;
-while(my @row1 = $stah1->fetchrow_array()) {
-	#my @news = 	 
+Tail:	
 	
-	push (@storage,".1.3.6.1.4.1.41717.30.".++$i,OCTET_STRING,$row1[1],".1.3.6.1.4.1.41717.30.".++$i,UNSIGNED32,$row1[3],".1.3.6.1.4.1.41717.30.".++$i,INTEGER,$row1[4],".1.3.6.1.4.1.41717.30.".++$i,UNSIGNED32,$row1[5])
-			
+@storage = ();
 
-
-		
-}
-#print @storage;
-my $str2 = qq(SELECT * from Status WHERE status = 3);
+my $str2 = qq(SELECT * from Status WHERE status = '3');
 my $stah2 = $dbh->prepare( $str2 );
 my $rv = $stah2->execute() or die $DBI::errstr;
 print "cursor ";
@@ -90,19 +86,77 @@ print "cursor ";
 #$i = 0;
 while(my @row2 = $stah2->fetchrow_array()) {
 	#my @news = 	 
-	
+	if($row2[2]>=$row2[4]){
 	push (@storage,".1.3.6.1.4.1.41717.20.1",OCTET_STRING,$row2[1],".1.3.6.1.4.1.41717.20.2",UNSIGNED32,$row2[3],".1.3.6.1.4.1.41717.20.3",INTEGER,$row2[4],".1.3.6.1.4.1.41717.20.4",UNSIGNED32,$row2[5])
-			
+			}
 
 
 		
 }
-print @storage;
+
+my $str1 = qq(SELECT * from Status WHERE status = '2');
+my $stah1 = $dbh->prepare( $str1 );
+my $rv = $stah1->execute() or die $DBI::errstr;
+#print "cursor ";
+
+$i = 0;
+while(my @row1 = $stah1->fetchrow_array()) {
+	#my @news = 	 
+	if($row1[2]>=$row1[4]){
+	push (@storage,".1.3.6.1.4.1.41717.30.".++$i,OCTET_STRING,$row1[1],".1.3.6.1.4.1.41717.30.".++$i,UNSIGNED32,$row1[3],".1.3.6.1.4.1.41717.30.".++$i,INTEGER,$row1[4],".1.3.6.1.4.1.41717.30.".++$i,UNSIGNED32,$row1[5])
+		}	
+
+
+		
+}
+#print @storage;
+my $str3 = qq(SELECT * from manager);
+my $stah3 = $dbh->prepare( $str3 );
+my $rv = $stah3->execute() or die $DBI::errstr;
+#print "cursor ";
+
+#$i = 0;
+while(my @row3 = $stah3->fetchrow_array()) {
+	#my @news = 	 
+	$hostname = $row3[1];
+
+	$port = $row3[3];
+	$community = $row3[2];
+					
+}
+print $hostname,$port,$community,"\n";
+
+print @storage,"\n";
+($session, $error) = Net::SNMP->session(
+                           -hostname      => "$hostname",
+                           -port          => "$port",
+			   -community     => "$community",
+                           -version => snmpv1,
+);
+
+if(!defined $session){
+print $error,"\n";
+exit 0;
+}
+$result = $session->trap(-varbindlist      => \@storage,
+                         #-enterprise      => "1.3.6.1.4.1.41717",
+                         # -agentaddr       => "127.0.0.1",
+                         # -generictrap     => 6,
+                         # -specifictrap    => 247,
+                       );
+
+if (!defined $result) {
+      printf "ERROR: %s\n", $session->error();
+      $session->close();
+      exit 1;
+}
 
 
 }
 
-print "success";
+
+
+print "success","\n";
   NetSNMP::TrapReceiver::register("all", \&my_receiver) || 
     warn "failed to register our perl trap handler\n";
 
