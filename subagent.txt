@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+
+use NetSNMP::agent (':all');
+use NetSNMP::ASN (':all');
+
+sub get_handler {
+  my ($handler, $registration_info, $request_info, $requests) = @_;
+  my $request;
+  
+my $unix_time = time(); 
+
+  for($request = $requests; $request; $request = $request->next()) {
+    my $oid = $request->getOID();
+    if ($request_info->getMode() == MODE_GET) {
+      if ($oid == new NetSNMP::OID(".1.3.6.1.4.1.4171.40.1")) {
+        $request->setValue(ASN_COUNTER, time());
+      }
+      elsif ($oid > new NetSNMP::OID(".1.3.6.1.4.1.4171.40.1")) {
+
+my $file = '/tmp/A1/counters.conf';
+open my $info, $file or die "Could not open $file: $!";
+my @oidSplit = split(/\./,$oid);
+my $lastele = $oidSplit[-1];
+
+
+
+while($line = <$info>){
+my @array = split(',',$line);
+
+my @values = $array[0];
+my @data = $array[1];
+
+for (my $i = 0 ; $i < @values ; $i++){
+if ( $lastele eq @values[i-1] + 1 ) {
+my $prevdata = $data[i-1];
+my $product = $prevdata * $unix_time ;
+$request->setValue(ASN_COUNTER, $product);
+
+
+}
+}
+}        
+
+    
+
+
+
+
+
+
+
+}      
+    }
+  }
+}
+
+my $agent = new NetSNMP::agent();
+$agent->register("oid_enterprise", ".1.3.6.1.4.1.4171.40",
+                 \&get_handler);
