@@ -1,0 +1,77 @@
+#!/usr/bin/python
+from easysnmp import Session
+import sys
+import time
+
+
+       
+if len(sys.argv) < 4:
+    print "insufficient arguments"
+    exit 
+
+x= sys.argv
+t = 1/float(x[2])
+cred = []
+cred = sys.argv[1].split(":")
+data = []
+samples = int(sys.argv[3])
+session = Session(hostname=cred[0], community=cred[2],remote_port=cred[1],version=2)
+snmptype = []
+sysup = []
+oids = ['.1.3.6.1.2.1.1.3.0']
+oids.extend(sys.argv[4:])        
+def probe():
+descriptions = session.get(oids)
+timestamp = int(time.time())
+sys = int(descriptions[0].value)/100
+data.append({'time':sys})
+snmptype.append({'timestamp':timestamp})
+if len(data)>=2:
+print int(timestamp),"|",
+        
+count = 1
+for oid in oids[1:]:
+y = descriptions[count].value
+if y == "NOSUCHINSTANCE" or y == "NOSUCHOBJECT":
+y=0
+data[-1][oid] = y
+snmptype[-1][oid] = descriptions[count].snmp_type
+count += 1
+if len(data)>=2:
+diff =  data[-1]["time"] - data[-2]["time"]
+#print data[-1]["time"],"-",data[-2]["time"],"--",diff,
+value = (float(data[-1][oid]) - float(data[-2][oid])) 
+#print value#/ diff
+
+if (float(value)<0):
+if snmptype[-1][oid] == 'COUNTER':
+new32 = float(value) + (2**32) #wrap =   (2**32)
+value = (float(new32)) / diff 
+elif snmptype[-1][oid] == 'COUNTER64':
+new64 = float(value) + (2**64)
+value = (float(new64)) / diff
+#print "denominator:",diff,
+print int(value),"|",
+end = time.time()
+execT=end-start
+time.sleep(t-execT)
+# '''
+
+if samples == int(-1) :
+j = 1
+while (j > 0):
+probe()
+end = time.time()
+execT=end-start
+time.sleep(t-execT)
+if j > 1:
+print ("")
+j = j + 1 
+else:
+for i in range(0, samples + 1):
+start = time.time()
+probe()
+if i>0:
+print ("")
+
+
