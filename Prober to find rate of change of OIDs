@@ -1,77 +1,92 @@
-#!/usr/bin/python
+#! /usr/bin/python
 from easysnmp import Session
+import easysnmp
 import sys
 import time
+from math import ceil
 
 
-       
-if len(sys.argv) < 4:
-    print "insufficient arguments"
-    exit 
+##Spliting the ip:port:community command line argument
+syst = str(sys.argv[1]).split(":")
 
-x= sys.argv
-t = 1/float(x[2])
-cred = []
-cred = sys.argv[1].split(":")
-data = []
-samples = int(sys.argv[3])
-session = Session(hostname=cred[0], community=cred[2],remote_port=cred[1],version=2)
-snmptype = []
-sysup = []
-oids = ['.1.3.6.1.2.1.1.3.0']
-oids.extend(sys.argv[4:])        
-def probe():
-descriptions = session.get(oids)
-timestamp = int(time.time())
-sys = int(descriptions[0].value)/100
-data.append({'time':sys})
-snmptype.append({'timestamp':timestamp})
-if len(data)>=2:
-print int(timestamp),"|",
-        
-count = 1
-for oid in oids[1:]:
-y = descriptions[count].value
-if y == "NOSUCHINSTANCE" or y == "NOSUCHOBJECT":
-y=0
-data[-1][oid] = y
-snmptype[-1][oid] = descriptions[count].snmp_type
-count += 1
-if len(data)>=2:
-diff =  data[-1]["time"] - data[-2]["time"]
-#print data[-1]["time"],"-",data[-2]["time"],"--",diff,
-value = (float(data[-1][oid]) - float(data[-2][oid])) 
-#print value#/ diff
+## frequency command line argumentÂ¨
+f = 1/float(sys.argv[2])
 
-if (float(value)<0):
-if snmptype[-1][oid] == 'COUNTER':
-new32 = float(value) + (2**32) #wrap =   (2**32)
-value = (float(new32)) / diff 
-elif snmptype[-1][oid] == 'COUNTER64':
-new64 = float(value) + (2**64)
-value = (float(new64)) / diff
-#print "denominator:",diff,
-print int(value),"|",
-end = time.time()
-execT=end-start
-time.sleep(t-execT)
-# '''
+## number of samples 
+n = sys.argv[3]
+count=0
+temp = []
+orequest = []
+output=[]
 
-if samples == int(-1) :
-j = 1
-while (j > 0):
-probe()
-end = time.time()
-execT=end-start
-time.sleep(t-execT)
-if j > 1:
-print ("")
-j = j + 1 
-else:
-for i in range(0, samples + 1):
-start = time.time()
-probe()
-if i>0:
-print ("")
+##first OID is always the SysUpTime OID
+temp.append('1.3.6.1.2.1.1.3.0')
+
+## storing all the OID's in command line in an array
+for x in (sys.argv[4:len(sys.argv)]):
+  temp.append(x)
+  
+##time before starting the application  
+beftime=time.time()
 
 
+while (count != int(n)):
+ t1=time.time()
+ try:
+  ## creating a SNMP object from the ip:port:community
+  session = Session(hostname=syst[0], remote_port = syst[1], community=syst[2], version=2,timeout=3, retries=1)
+  nrequest = session.get(temp)
+ ##try snmp get and if you don't get SNMP TimeOut Error then continue  
+ except easysnmp.exceptions.EasySNMPTimeoutError:
+  continue
+ if len(nrequest) == len(orequest):
+        ## If present SysUpTime is more than previous then the device has restarted. starting from beginning of the function with all counters and values reset
+        if int(nrequest[0].value)<int(orequest[0].value):
+           print "reeboot"
+           nrequest=[]
+           orequest=[]
+           beftime=time.time()
+        else:
+		## If num of samples is -1. then keep running
+         if f < 1:
+            nt=float(nrequest[0].value)/100
+            ot=float(orequest[0].value)/100
+         else:
+          
+	 	nt=int(nrequest[0].value)/100
+                ot=int(orequest[0].value)/100
+         for i in range(1,len(temp)):
+           if nrequest[i].value!="NOSUCHINSTANCE" and orequest[i].value!="NOSUCHINSTANCE":
+		 nv=int(nrequest[i].value)
+		 newtype=str(nrequest[i].snmp_type)
+		 
+		 ov=int(orequest[i].value)
+		 ##If old value is greater than new value, which should not happen. So It means counter wrap has occurred.Find the type of counter and add  --- 2 pow <counter-type>
+		 if (ov > nv) and newtype == "COUNTER":
+			 rate= ((2**32 +nv) - ov)/(nt - ot)
+			
+                         output.append(rate)
+		 elif (ov > nv) and newtype == "COUNTER64":
+			 rate= ((2**64 +nv) - ov)/(nt - ot)
+			
+                         output.append(rate)
+		 else:
+		         rate= (nv - ov)/(nt - ot)
+			 
+                         output.append(rate)
+           else:
+              print t1,"|"
+         if len(output)!=0:
+		o2 = [str(get) for get in output]
+		print t1 ,'|', ("| " . join(o2))
+
+         count = count+1
+ del output[:]
+ orequest = nrequest[:]
+ t2=time.time()
+ ##end of one sample . take time and subtract from start time. sleep for the remaining time.
+ rou=ceil((t2 - beftime)/f)
+ sleepTime = (beftime+rou*f) - t2
+ if sleepTime<=0.0:
+   sleepTime = (beftime+(rou+1)*f) - t2
+ time.sleep(sleepTime)
